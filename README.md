@@ -1,19 +1,36 @@
-# Tetris Game
+# Modern Tetris Game
 
-## Game Description
-
-- This is an implementation of the classic Tetris game.
-- Control pieces using keyboard input and score points by aligning as many pieces as possible.
-- The game ends when pieces stack up beyond the top of the screen.
+A modern implementation of the classic Tetris game using HTML5 Canvas and JavaScript.
 
 ![Tetris Game Screenshot](image.png)
 
-## Controls
+## Features
 
-- Left Arrow: Move piece left
-- Right Arrow: Move piece right
-- Down Arrow: Soft drop
-- Space Bar: Hard drop
-- Up Arrow: Rotate piece clockwise
-- Z Key: Rotate piece counter-clockwise
+- Modern gradient-colored pieces
+- Ghost piece preview
+- Score tracking
+- Level progression
+- Line clear animations
 
+## How to Play
+
+1. Open `index.html` in your web browser
+2. Use the following controls:
+   - Left/Right Arrow: Move piece
+   - Up Arrow: Rotate piece clockwise
+   - Down Arrow: Soft drop
+   - Space Bar: Hard drop
+
+## Technologies Used
+
+- HTML5 Canvas
+- Vanilla JavaScript
+- CSS3
+
+## Installation
+
+No installation required! Simply clone the repository and open `index.html` in your browser:
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
