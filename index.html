@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Modern Tetris</title>
+    <style>
+      body {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        font-family: 'Arial', sans-serif;
+        color: #fff;
+      }
+
+      #game-container {
+        position: relative;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+      }
+
+      canvas {
+        border: 3px solid #333;
+        border-radius: 5px;
+        background-color: rgba(0, 0, 0, 0.8);
+      }
+
+      #score-container {
+        position: absolute;
+        top: 20px;
+        right: -180px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 20px;
+        border-radius: 10px;
+        min-width: 150px;
+      }
+
+      .score-label {
+        font-size: 18px;
+        margin-bottom: 10px;
+        color: #4a9eff;
+      }
+
+      .score-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #fff;
+      }
+
+      #game-over {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9);
+        padding: 30px;
+        border-radius: 15px;
+        text-align: center;
+        display: none;
+      }
+
+      button {
+        background: linear-gradient(45deg, #4a9eff, #6c63ff);
+        border: none;
+        color: white;
+        padding: 15px 32px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 25px;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .controls {
+        margin-top: 20px;
+        font-size: 14px;
+        color: #888;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container">
+      <canvas id="tetris" width="240" height="400"></canvas>
+      <div id="score-container">
+        <div class="score-label">SCORE</div>
+        <div id="score-value" class="score-value">0</div>
+        <div class="score-label" style="margin-top: 20px;">LINES</div>
+        <div id="lines-value" class="score-value">0</div>
+        <div class="score-label" style="margin-top: 20px;">LEVEL</div>
+        <div id="level-value" class="score-value">1</div>
+      </div>
+      <div id="game-over">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="final-score">0</span></p>
+        <button onclick="resetGame()">Play Again</button>
+      </div>
+    </div>
+    <div class="controls">
+      ← → : Move  |  ↑ : Rotate  |  ↓ : Soft Drop  |  Space : Hard Drop
+    </div>
+
+    <script>
+      const canvas = document.getElementById('tetris');
+      const context = canvas.getContext('2d');
+      const scoreElement = document.getElementById('score-value');
+      const linesElement = document.getElementById('lines-value');
+      const levelElement = document.getElementById('level-value');
+      const finalScoreElement = document.getElementById('final-score');
+      const gameOverElement = document.getElementById('game-over');
+
+      context.scale(20, 20);
+
+      // 공식 테트리스 피스 정의
+      const SHAPES = {
+          'I': [
+              [0, 0, 0, 0],
+              [1, 1, 1, 1],
+              [0, 0, 0, 0],
+              [0, 0, 0, 0]
+          ],
+          'O': [
+              [2, 2],
+              [2, 2]
+          ],
+          'T': [
+              [0, 3, 0],
+              [3, 3, 3],
+              [0, 0, 0]
+          ],
+          'S': [
+              [0, 4, 4],
+              [4, 4, 0],
+              [0, 0, 0]
+          ],
+          'Z': [
+              [5, 5, 0],
+              [0, 5, 5],
+              [0, 0, 0]
+          ],
+          'J': [
+              [6, 0, 0],
+              [6, 6, 6],
+              [0, 0, 0]
+          ],
+          'L': [
+              [0, 0, 7],
+              [7, 7, 7],
+              [0, 0, 0]
+          ]
+      };
+
+      // 각 피스별 그라데이션 색상 정의
+      const COLORS = {
+          'I': ['#00f0f0', '#00e0e0', '#00d0d0'],  // 청록색
+          'O': ['#f0f000', '#e0e000', '#d0d000'],  // 노란색
+          'T': ['#a000f0', '#9000e0', '#8000d0'],  // 보라색
+          'S': ['#00f000', '#00e000', '#00d000'],  // 녹색
+          'Z': ['#f00000', '#e00000', '#d00000'],  // 빨간색
+          'J': ['#0000f0', '#0000e0', '#0000d0'],  // 파란색
+          'L': ['#f0a000', '#e09000', '#d08000']   // 주황색
+      };
+
+      // 게임 상태 변수
+      let dropCounter = 0;
+      let dropInterval = 1000;
+      let lastTime = 0;
+      let gameSpeed = 1000;
+      let level = 1;
+      let linesCleared = 0;
+
+      const player = {
+          pos: { x: 0, y: 0 },
+          matrix: null,
+          score: 0,
+          ghost: { x: 0, y: 0 }
+      };
+
+      const arena = createMatrix(12, 20);
+
+      function createMatrix(w, h) {
+          const matrix = [];
+          while (h--) {
+              matrix.push(new Array(w).fill(0));
+          }
+          return matrix;
+      }
+
+      function createPiece(type) {
+          return SHAPES[type];
+      }
+
+      // 충돌 검사
+      function collide(arena, player) {
+          const [m, o] = [player.matrix, player.pos];
+          for (let y = 0; y < m.length; ++y) {
+              for (let x = 0; x < m[y].length; ++x) {
+                  if (m[y][x] !== 0 &&
+                      (arena[y + o.y] &&
+                      arena[y + o.y][x + o.x]) !== 0) {
+                      return true;
+                  }
+              }
+          }
+          return false;
+      }
+
+      // 피스 병합
+      function merge(arena, player) {
+          player.matrix.forEach((row, y) => {
+              row.forEach((value, x) => {
+                  if (value !== 0) {
+                      arena[y + player.pos.y][x + player.pos.x] = value;
+                  }
+              });
+          });
+      }
+
+      // 피스 회전
+      function rotate(matrix, dir) {
+          for (let y = 0; y < matrix.length; ++y) {
+              for (let x = 0; x < y; ++x) {
+                  [
+                      matrix[x][y],
+                      matrix[y][x],
+                  ] = [
+                      matrix[y][x],
+                      matrix[x][y],
+                  ];
+              }
+          }
+          if (dir > 0) {
+              matrix.forEach(row => row.reverse());
+          } else {
+              matrix.reverse();
+          }
+      }
+
+      // 고스트 피스 위치 계산
+      function calculateGhostPosition() {
+          player.ghost.x = player.pos.x;
+          player.ghost.y = player.pos.y;
+          while (!collide(arena, { pos: player.ghost, matrix: player.matrix })) {
+              player.ghost.y++;
+          }
+          player.ghost.y--;
+      }
+
+      // 피스 드롭
+      async function playerDrop() {
+          player.pos.y++;
+          if (collide(arena, player)) {
+              player.pos.y--;
+              merge(arena, player);
+              playerReset();
+              await arenaSweep();
+              updateScore();
+          }
+          dropCounter = 0;
+      }
+
+      // 하드 드롭
+      function hardDrop() {
+          while (!collide(arena, player)) {
+              player.pos.y++;
+          }
+          player.pos.y--;
+          merge(arena, player);
+          playerReset();
+          arenaSweep();
+          updateScore();
+          dropCounter = 0;
+      }
+
+      // 피스 이동
+      function playerMove(dir) {
+          player.pos.x += dir;
+          if (collide(arena, player)) {
+              player.pos.x -= dir;
+          }
+      }
+
+      // 새로운 피스 생성
+      function playerReset() {
+          const pieces = 'ILJOTSZ';
+          const randomPiece = pieces[pieces.length * Math.random() | 0];
+          player.matrix = createPiece(randomPiece);
+          player.pos.y = 0;
+          player.pos.x = (arena[0].length / 2 | 0) -
+                         (player.matrix[0].length / 2 | 0);
+          
+          if (collide(arena, player)) {
+              gameOver();
+          }
+      }
+
+      // 피스 회전 처리
+      function playerRotate(dir) {
+          const pos = player.pos.x;
+          let offset = 1;
+          rotate(player.matrix, dir);
+          while (collide(arena, player)) {
+              player.pos.x += offset;
+              offset = -(offset + (offset > 0 ? 1 : -1));
+              if (offset > player.matrix[0].length) {
+                  rotate(player.matrix, -dir);
+                  player.pos.x = pos;
+                  return;
+              }
+          }
+      }
+
+      // 라인 제거 애니메이션
+      async function animateRowClear(y) {
+          const colors = [
+              '#FFFFFF',   // 밝은 흰색
+              '#FFF700',   // 밝은 노란색
+              '#FFB700',   // 밝은 주황색
+              '#FF5900',   // 밝은 빨간색
+              '#FF0000',   // 빨간색
+              'transparent'
+          ];
+
+          for (const color of colors) {
+              for (let x = 0; x < arena[y].length; x++) {
+                  if (arena[y][x] !== 0) {
+                      context.fillStyle = color;
+                      context.fillRect(x, y, 1, 1);
+                  }
+              }
+              await new Promise(resolve => setTimeout(resolve, 30));
+          }
+      }
+
+      // 완성된 라인 제거
+      async function arenaSweep() {
+          let rowCount = 0;
+          for (let y = arena.length - 1; y > 0; --y) {
+              let isComplete = true;
+              for (let x = 0; x < arena[y].length; ++x) {
+                  if (arena[y][x] === 0) {
+                      isComplete = false;
+                      break;
+                  }
+              }
+
+              if (isComplete) {
+                  await animateRowClear(y);
+                  const row = arena.splice(y, 1)[0].fill(0);
+                  arena.unshift(row);
+                  ++y;
+                  rowCount++;
+                  linesCleared++;
+                  
+                  // 레벨 업 체크
+                  if (linesCleared % 10 === 0) {
+                      level++;
+                      gameSpeed = Math.max(100, 1000 - (level - 1) * 100);
+                      levelElement.textContent = level;
+                  }
+              }
+          }
+
+          // 점수 계산
+          if (rowCount > 0) {
+              player.score += [40, 100, 300, 1200][rowCount - 1] * level;
+              updateScore();
+          }
+      }
+
+      // 게임 오버 처리
+      function gameOver() {
+          finalScoreElement.textContent = player.score;
+          gameOverElement.style.display = 'block';
+      }
+
+      // 게임 리셋
+      function resetGame() {
+          arena.forEach(row => row.fill(0));
+          player.score = 0;
+          level = 1;
+          linesCleared = 0;
+          gameSpeed = 1000;
+          updateScore();
+          gameOverElement.style.display = 'none';
+          levelElement.textContent = level;
+          linesElement.textContent = linesCleared;
+          playerReset();
+      }
+
+      // 점수 업데이트
+      function updateScore() {
+          scoreElement.textContent = player.score;
+          linesElement.textContent = linesCleared;
+      }
+
+      // 그리기 함수
+      function draw() {
+          context.fillStyle = '#000';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+
+          // 고스트 피스 그리기
+          calculateGhostPosition();
+          drawMatrix(player.matrix, player.ghost, true);
+          
+          // 실제 피스와 보드 그리기
+          drawMatrix(arena, {x: 0, y: 0});
+          drawMatrix(player.matrix, player.pos);
+      }
+
+      // 매트릭스 그리기
+      function drawMatrix(matrix, offset, isGhost = false) {
+          matrix.forEach((row, y) => {
+              row.forEach((value, x) => {
+                  if (value !== 0) {
+                      const pieceType = Object.keys(SHAPES)[value - 1];
+                      const colors = COLORS[pieceType];
+                      
+                      if (isGhost) {
+                          // 고스트 피스는 반투명하게 그리기
+                          context.fillStyle = `${colors[0]}33`;
+                      } else {
+                          // 그라데이션 효과
+                          const gradient = context.createLinearGradient(
+                              x + offset.x,
+                              y + offset.y,
+                              x + offset.x + 1,
+                              y + offset.y + 1
+                          );
+                          gradient.addColorStop(0, colors[0]);
+                          gradient.addColorStop(0.5, colors[1]);
+                          gradient.addColorStop(1, colors[2]);
+                          context.fillStyle = gradient;
+                      }
+                      
+                      context.fillRect(x + offset.x, y + offset.y, 1, 1);
+                  }
+              });
+          });
+      }
+
+      // 게임 업데이트
+      function update(time = 0) {
+          const deltaTime = time - lastTime;
+          lastTime = time;
+
+          dropCounter += deltaTime;
+          if (dropCounter > gameSpeed) {
+              playerDrop();
+          }
+
+          draw();
+          requestAnimationFrame(update);
+      }
+
+      // 키보드 이벤트 처리
+      document.addEventListener('keydown', event => {
+          if (gameOverElement.style.display === 'block') {
+              return;
+          }
+          
+          switch(event.keyCode) {
+              case 37: // 왼쪽
+                  playerMove(-1);
+                  break;
+              case 39: // 오른쪽
+                  playerMove(1);
+                  break;
+              case 40: // 아래
+                  playerDrop();
+                  break;
+              case 38: // 위
+                  playerRotate(1);
+                  break;
+              case 32: // 스페이스바
+                  hardDrop();
+                  break;
+          }
+      });
+
+      // 게임 시작
+      playerReset();
+      updateScore();
+      update();
+    </script>
+  </body>
+</html>
