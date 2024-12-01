@@ -31,6 +31,10 @@ A modern implementation of the classic Tetris game using HTML5 Canvas and JavaSc
 
 No installation required! Simply clone the repository and open `index.html` in your browser:
 
+## Live Demo
+
+You can play the game directly at: [Tetris Game](https://genishk.github.io/tetris-game)
+
 ## License
 
 This project is open source and available under the [MIT License](LICENSE).
